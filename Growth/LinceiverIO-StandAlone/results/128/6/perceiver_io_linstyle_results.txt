@@ -1,0 +1,35 @@
+===== perceiver-io-linstyle 학습 결과 =====
+
+Epoch 1: Train Loss=6.9756, Test Loss=1.9043, Test Acc=0.2786
+Epoch 2: Train Loss=1.8263, Test Loss=1.4931, Test Acc=0.3969
+Epoch 3: Train Loss=1.4653, Test Loss=1.2473, Test Acc=0.5277
+Epoch 4: Train Loss=1.2342, Test Loss=1.0982, Test Acc=0.5588
+Epoch 5: Train Loss=1.1383, Test Loss=1.0460, Test Acc=0.5814
+Epoch 6: Train Loss=1.0295, Test Loss=0.9249, Test Acc=0.6273
+Epoch 7: Train Loss=0.9577, Test Loss=0.8757, Test Acc=0.6519
+Epoch 8: Train Loss=0.8967, Test Loss=0.8294, Test Acc=0.6833
+Epoch 9: Train Loss=0.8476, Test Loss=0.7963, Test Acc=0.7106
+Epoch 10: Train Loss=0.7941, Test Loss=0.8086, Test Acc=0.6975
+Epoch 11: Train Loss=0.7500, Test Loss=0.7794, Test Acc=0.7028
+Epoch 12: Train Loss=0.7207, Test Loss=0.6938, Test Acc=0.7445
+Epoch 13: Train Loss=0.7020, Test Loss=0.6792, Test Acc=0.7481
+Epoch 14: Train Loss=0.6983, Test Loss=0.6732, Test Acc=0.7499
+Epoch 15: Train Loss=0.6835, Test Loss=0.6491, Test Acc=0.7644
+Epoch 16: Train Loss=0.6571, Test Loss=0.6543, Test Acc=0.7523
+Epoch 17: Train Loss=0.6471, Test Loss=0.6278, Test Acc=0.7741
+Epoch 18: Train Loss=0.6319, Test Loss=0.6044, Test Acc=0.7763
+Epoch 19: Train Loss=0.6097, Test Loss=0.5866, Test Acc=0.7864
+Epoch 20: Train Loss=0.6001, Test Loss=0.5891, Test Acc=0.7883
+Epoch 21: Train Loss=0.5906, Test Loss=0.5862, Test Acc=0.7833
+Epoch 22: Train Loss=0.5724, Test Loss=0.5606, Test Acc=0.7968
+Epoch 23: Train Loss=0.5595, Test Loss=0.5523, Test Acc=0.7979
+Epoch 24: Train Loss=0.5497, Test Loss=0.5498, Test Acc=0.8036
+Epoch 25: Train Loss=0.5372, Test Loss=0.5331, Test Acc=0.8117
+Epoch 26: Train Loss=0.5230, Test Loss=0.5191, Test Acc=0.8190
+Epoch 27: Train Loss=0.5173, Test Loss=0.5132, Test Acc=0.8197
+Epoch 28: Train Loss=0.5033, Test Loss=0.4889, Test Acc=0.8278
+Epoch 29: Train Loss=0.4988, Test Loss=0.5092, Test Acc=0.8201
+Epoch 30: Train Loss=0.4884, Test Loss=0.5077, Test Acc=0.8194
+
+총 학습 시간 (초): 247.59
+모델 크기 (MB): 1.21
