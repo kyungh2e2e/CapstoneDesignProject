@@ -13,7 +13,7 @@ pip install torch==1.10.2 torchvision==0.11.3 einops==0.8.0 tensorboardX==2.1
 
 ## Project Overview
 
-본 프로젝트는 Federated Learning 환경에서 **Perceiver IO 스타일** 모델을 사용하여 FashionMNIST 데이터셋을 학습하는 코드입니다.
+본 프로젝트는 Federated Learning 환경에서 **Linceiver IO 스타일** 모델을 사용하여 Fashion-MNIST 데이터셋을 학습하는 코드입니다.
 
 - **`federated_main_per.py`**: 메인 실행 파일. Federated 학습 로직이 구현되어 있습니다.
 - **`federated_batch.sh`**: 여러 hyperparameter 조합에 대해 batch로 `federated_main_per.py`를 실행하는 스크립트입니다.
