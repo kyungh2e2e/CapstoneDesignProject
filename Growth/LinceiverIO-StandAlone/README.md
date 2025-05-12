@@ -17,6 +17,7 @@ pip install torch==1.10.2 torchvision==0.11.3 einops==0.8.0
 - `main.py`: 단일 실험 실행 스크립트 (모델 학습 및 평가)
 - `perceiver_io_linstyle.py`: Perceiver IO 모델 (Linformer 스타일) 정의 파일
 - `run_batch.sh`: 여러 실험(batch run) 자동 실행 스크립트
+- `report_batch.sh`: 실험 수행 후 생성된 result.txt 파일들을 평균내어 report.txt 생성
 
 ### Step 2: run_batch.sh 실행 방법
 
