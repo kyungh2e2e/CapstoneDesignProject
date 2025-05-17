@@ -164,17 +164,19 @@ class PerceiverIO(nn.Module):
 # Training & Evaluation
 # ---------------------------
 
+import torch.nn.functional as F
+
 def train_one_epoch(model, embed, classifier, loader, optimizer, device):
     model.train(); embed.train(); classifier.train()
-    total_loss, total = 0, 0
-    for imgs, labels in tqdm(loader, desc="Train"):  
+    total_loss, total = 0.0, 0
+    for batch_idx, (imgs, labels) in enumerate(loader, start=1):
         imgs, labels = imgs.to(device), labels.to(device)
         b = imgs.size(0)
         imgs = imgs.view(b, -1, 1)
 
         optimizer.zero_grad()
-        tokens = embed(imgs)  # (b, seq_len, latent_dim)
-        latents = model(tokens)  # cross-attn 내부에서 context=tokens 적용
+        tokens = embed(imgs)               # (b, seq_len, latent_dim)
+        latents = model(tokens)            # cross‐attn 내부에서 context=tokens 적용
         pooled = latents.mean(dim=1)
         logits = classifier(pooled)
 
@@ -184,6 +186,12 @@ def train_one_epoch(model, embed, classifier, loader, optimizer, device):
 
         total_loss += loss.item() * b
         total += b
+
+        """# 예: 100배치마다 한 번씩 로그 찍기
+        if batch_idx % 100 == 0 or batch_idx == len(loader):
+            avg_loss = total_loss / total
+            print(f"[Batch {batch_idx:4d}/{len(loader)}] Avg Loss: {avg_loss:.4f}")"""
+
     return total_loss / total
 
 
@@ -237,58 +245,68 @@ if __name__ == "__main__":
         list(model.parameters()) + list(embed.parameters()) + list(classifier.parameters()),
         lr=5e-4
     )
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=1e-5)
 
-    # 기록용 리스트
-    k_history = []
-    train_loss_history = []
-    test_loss_history = []
-    test_acc_history = []
     epochs = 50
+    history = {
+        'train_loss': [], 
+        'val_loss':   [], 
+        'val_acc':    [], 
+        'lr':         []
+    }
+    k_history = []
 
     for epoch in range(1, epochs+1):
-        train_loss = train_one_epoch(model, embed, classifier, train_loader, optimizer, device)
-        test_loss, test_acc = evaluate(model, embed, classifier, test_loader, device)
-        print(f"Epoch {epoch}: Train Loss={train_loss:.4f}, Test Loss={test_loss:.4f}, Test Acc={test_acc:.4f}")
+        tl = train_one_epoch(model, embed, classifier, train_loader, optimizer, device)
+        vl, va = evaluate(model, embed, classifier, test_loader, device)
+        scheduler.step()
 
-        # 기록
-        train_loss_history.append(train_loss)
-        test_loss_history.append(test_loss)
-        test_acc_history.append(test_acc)
-        gate_k = model.layers[0][0].gate_k.detach()
+        # 현재 effective k 계산
+        gate_k  = model.layers[0][0].gate_k.detach()
         alpha_k = model.layers[0][0].alpha_k.detach()
-        effective_k = (torch.sigmoid(gate_k) * alpha_k).mean().item()
-        k_history.append(effective_k)
+        eff_k = (torch.sigmoid(gate_k) * alpha_k).mean().item()
+        k_max = model.layers[0][0].proj_k.size(1)  # proj_k: [seq_len_kv, k_max]
+        eff_k *= k_max
+        # 기록
+        history['train_loss'].append(tl)
+        history['val_loss'].append(vl)
+        history['val_acc'].append(va)
+        history['lr'].append(optimizer.param_groups[0]['lr'])
+        k_history.append(eff_k)
 
-    # Plot: Adaptive k 변화
-    plt.figure()
-    plt.plot(range(1, epochs+1), k_history, label='Mean Effective k')
-    plt.xlabel('Epoch')
-    plt.ylabel('Mean Effective k')
-    plt.title('Adaptive k')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig("./mnist_k.png")
-    plt.show()
+        print(f"Epoch {epoch:03d} | "
+              f"TrainLoss {tl:.4f} | ValLoss {vl:.4f} | ValAcc {va:.4f} | "
+              f"LR {optimizer.param_groups[0]['lr']:.1e} | k={eff_k:.2f}")
 
-    # Plot: Loss
+
+    epochs_range = range(1, epochs+1)
+
     plt.figure()
-    plt.plot(range(1, epochs+1), train_loss_history, label='Train Loss')
-    plt.plot(range(1, epochs+1), test_loss_history, label='Test Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    plt.plot(epochs_range, history['train_loss'], label='Train Loss')
+    plt.plot(epochs_range, history['val_loss'],   label='Val Loss')
+    plt.xlabel('Epoch'); plt.ylabel('Loss')
     plt.title('Loss over Epochs')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig("./mnist_loss.png")
-    plt.show()
+    plt.legend(); plt.grid()
+    plt.savefig("./cifar_loss.png")
 
-    # Plot: Accuracy
     plt.figure()
-    plt.plot(range(1, epochs+1), test_acc_history, label='Test Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Test Accuracy over Epochs')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig("./mnist_accuracy.png")
+    plt.plot(epochs_range, history['val_acc'], label='Val Accuracy')
+    plt.xlabel('Epoch'); plt.ylabel('Accuracy')
+    plt.title('Validation Accuracy over Epochs')
+    plt.legend(); plt.grid()
+    plt.savefig("./cifar_acc.png")
+
+    plt.figure()
+    plt.plot(epochs_range, history['lr'], label='Learning Rate')
+    plt.xlabel('Epoch'); plt.ylabel('LR')
+    plt.title('Learning Rate Schedule')
+    plt.legend(); plt.grid()
+
+    plt.figure()
+    plt.plot(epochs_range, k_history, label='Mean Effective k')
+    plt.xlabel('Epoch'); plt.ylabel('Effective k')
+    plt.title('Adaptive k')
+    plt.legend(); plt.grid()
+    plt.savefig("./cifar_k.png")
+
     plt.show()
