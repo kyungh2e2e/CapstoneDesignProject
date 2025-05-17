@@ -287,14 +287,14 @@ if __name__ == "__main__":
     plt.xlabel('Epoch'); plt.ylabel('Loss')
     plt.title('Loss over Epochs')
     plt.legend(); plt.grid()
-    plt.savefig("./cifar_loss.png")
+    plt.savefig("./mnist_loss.png")
 
     plt.figure()
     plt.plot(epochs_range, history['val_acc'], label='Val Accuracy')
     plt.xlabel('Epoch'); plt.ylabel('Accuracy')
     plt.title('Validation Accuracy over Epochs')
     plt.legend(); plt.grid()
-    plt.savefig("./cifar_acc.png")
+    plt.savefig("./mnist_acc.png")
 
     plt.figure()
     plt.plot(epochs_range, history['lr'], label='Learning Rate')
@@ -307,6 +307,6 @@ if __name__ == "__main__":
     plt.xlabel('Epoch'); plt.ylabel('Effective k')
     plt.title('Adaptive k')
     plt.legend(); plt.grid()
-    plt.savefig("./cifar_k.png")
+    plt.savefig("./mnist_k.png")
 
     plt.show()
