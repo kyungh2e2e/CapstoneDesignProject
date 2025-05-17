@@ -1,3 +1,4 @@
+import math
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -54,7 +55,7 @@ class LinformerAttention(nn.Module):
         self.to_q = nn.Linear(dim, inner_dim, bias=False)
         self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
 
-        # projection matrices for q and context (kv)
+        # low-rank projection matrices & gating
         self.proj_k = nn.Parameter(torch.randn(self.seq_len_kv, k_max))
         self.proj_v = nn.Parameter(torch.randn(self.seq_len_kv, k_max))
         self.gate_k = nn.Parameter(torch.ones(k_max) * 0.5)
@@ -67,29 +68,23 @@ class LinformerAttention(nn.Module):
 
     def forward(self, x, context=None):
         b, n_q, _ = x.shape
-        # context sequence length
         context = x if context is None else context
-        b_c, n_kv, _ = context.shape
+        _, n_kv, _ = context.shape
 
-        q = self.to_q(x)  # (b, n_q, inner_dim)
-        k, v = self.to_kv(context).chunk(2, dim=-1)  # (b, n_kv, inner_dim)
+        q = self.to_q(x)
+        k, v = self.to_kv(context).chunk(2, dim=-1)
 
-        # adaptive k/v projection
-        eff_k = self.proj_k * (torch.sigmoid(self.gate_k) * self.alpha_k)  # (n_kv, k_max)
+        eff_k = self.proj_k * (torch.sigmoid(self.gate_k) * self.alpha_k)
         eff_v = self.proj_v * (torch.sigmoid(self.gate_v) * self.alpha_v)
 
-        # project k, v into lower dimension
-        # 'b n d, n k -> b k d'
         k = torch.einsum('b n d, n k -> b k d', k, eff_k)
         v = torch.einsum('b n d, n k -> b k d', v, eff_v)
 
-        # reshape for multihead
         h = self.heads
         q = rearrange(q, 'b n (h d) -> b h n d', h=h)
         k = rearrange(k, 'b k (h d) -> b h k d', h=h)
         v = rearrange(v, 'b k (h d) -> b h k d', h=h)
 
-        # scaled dot-product
         attn = (q @ k.transpose(-1, -2)) * self.scale
         attn = attn.softmax(dim=-1)
         attn = self.dropout(attn)
@@ -99,8 +94,29 @@ class LinformerAttention(nn.Module):
         return self.to_out(out)
 
 # ---------------------------
-# PerceiverIO Definition
+# Sinusoidal Positional Encoding
 # ---------------------------
+
+class SinusoidalPE(nn.Module):
+    def __init__(self, seq_len, dim):
+        super().__init__()
+        pe = torch.zeros(seq_len, dim)
+        position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, dim, 2, dtype=torch.float) * -(math.log(10000.0) / dim)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)  # non-trainable
+
+    def forward(self, x):
+        # x: (B, seq_len, dim)
+        return x + self.pe.unsqueeze(0)
+
+# ---------------------------
+# PerceiverIO with Hybrid PE
+# ---------------------------
+
 class PerceiverIO(nn.Module):
     def __init__(
         self,
@@ -115,11 +131,18 @@ class PerceiverIO(nn.Module):
     ):
         super().__init__()
         self.seq_len = seq_len
+        self.latent_dim = latent_dim
+
+        # 1) learnable pos emb, but zero-initialized (so it starts neutral)
+        self.pos_emb = nn.Parameter(torch.zeros(seq_len, latent_dim))
+        # 2) sinusoidal PE
+        self.sin_pe = SinusoidalPE(seq_len, latent_dim)
+
+        # global latents
         self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
         self.layers = nn.ModuleList()
 
         for i in range(depth):
-            # 첫 레이어는 cross-attn: seq_len_q=num_latents, seq_len_kv=seq_len(input)
             if i == 0:
                 attn = LinformerAttention(
                     dim=latent_dim,
@@ -131,7 +154,6 @@ class PerceiverIO(nn.Module):
                     dropout=dropout
                 )
             else:
-                # 이후 레이어는 self-attn: seq_len_q=seq_len_kv=num_latents
                 attn = LinformerAttention(
                     dim=latent_dim,
                     seq_len_q=num_latents,
@@ -146,13 +168,16 @@ class PerceiverIO(nn.Module):
         self.norm = nn.LayerNorm(latent_dim)
 
     def forward(self, x, context=None):
-        # x: (B, seq_len, latent_dim), context for cross-attn
+        # x: (B, seq_len, latent_dim)
+        # apply both PEs:
+        x = x + self.pos_emb.unsqueeze(0)     # learnable (starts zero)
+        x = self.sin_pe(x)                    # fixed sin-cos
+
         b = x.size(0)
         latents = repeat(self.latents, 'n d -> b n d', b=b)
 
         for i, (attn, ff) in enumerate(self.layers):
             if i == 0:
-                # 첫 블록에만 cross-attn 사용
                 latents = attn(latents, context=x) + latents
             else:
                 latents = attn(latents) + latents
@@ -163,37 +188,27 @@ class PerceiverIO(nn.Module):
 # ---------------------------
 # Training & Evaluation
 # ---------------------------
-
-import torch.nn.functional as F
-
 def train_one_epoch(model, embed, classifier, loader, optimizer, device):
     model.train(); embed.train(); classifier.train()
-    total_loss, total = 0.0, 0
+    total_loss, total = 0, 0
     for batch_idx, (imgs, labels) in enumerate(loader, start=1):
         imgs, labels = imgs.to(device), labels.to(device)
         b = imgs.size(0)
-        imgs = imgs.view(b, -1, 1)
 
-        optimizer.zero_grad()
-        tokens = embed(imgs)               # (b, seq_len, latent_dim)
-        latents = model(tokens)            # cross‐attn 내부에서 context=tokens 적용
+        tokens = imgs.permute(0,2,3,1).reshape(b, -1, 3)
+        tokens = embed(tokens)
+        latents = model(tokens)
         pooled = latents.mean(dim=1)
         logits = classifier(pooled)
 
         loss = F.cross_entropy(logits, labels)
         loss.backward()
         optimizer.step()
+        optimizer.zero_grad()
 
         total_loss += loss.item() * b
         total += b
-
-        """# 예: 100배치마다 한 번씩 로그 찍기
-        if batch_idx % 100 == 0 or batch_idx == len(loader):
-            avg_loss = total_loss / total
-            print(f"[Batch {batch_idx:4d}/{len(loader)}] Avg Loss: {avg_loss:.4f}")"""
-
     return total_loss / total
-
 
 def evaluate(model, embed, classifier, loader, device):
     model.eval(); embed.eval(); classifier.eval()
@@ -202,9 +217,9 @@ def evaluate(model, embed, classifier, loader, device):
         for imgs, labels in loader:
             imgs, labels = imgs.to(device), labels.to(device)
             b = imgs.size(0)
-            imgs = imgs.view(b, -1, 1)
 
-            tokens = embed(imgs)
+            tokens = imgs.permute(0,2,3,1).reshape(b, -1, 3)
+            tokens = embed(tokens)
             latents = model(tokens)
             pooled = latents.mean(dim=1)
             logits = classifier(pooled)
@@ -215,35 +230,32 @@ def evaluate(model, embed, classifier, loader, device):
             total_loss += loss.item() * b
             total_correct += (preds == labels).sum().item()
             total += b
-
     return total_loss / total, total_correct / total
 
 # ---------------------------
 # Main
 # ---------------------------
+
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Using device:", device)
 
-    # Data
-    transform = transforms.Compose([
+    cifar_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.Normalize((0.4914,0.4822,0.4465),(0.2470,0.2435,0.2616)),
     ])
-    train_ds = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    test_ds  = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    train_ds = datasets.CIFAR10('./data',True,transform=cifar_transform,download=True)
+    test_ds  = datasets.CIFAR10('./data',False,transform=cifar_transform,download=True)
+    train_loader = DataLoader(train_ds, batch_size=128, shuffle=True, num_workers=4)
+    test_loader  = DataLoader(test_ds,  batch_size=128, shuffle=False, num_workers=4)
 
-    train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
-    test_loader  = DataLoader(test_ds,  batch_size=64, shuffle=False)
+    seq_len, latent_dim, num_classes = 32*32, 64, 10
+    model = PerceiverIO(seq_len=seq_len, latent_dim=latent_dim).to(device)
+    embed = nn.Linear(3, latent_dim).to(device)
+    classifier = nn.Linear(latent_dim, num_classes).to(device)
 
-    # Model, Embedding, Classifier
-    model = PerceiverIO(seq_len=28*28).to(device)
-    embed = nn.Linear(1, 64).to(device)
-    classifier = nn.Linear(64, 10).to(device)
-
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         list(model.parameters()) + list(embed.parameters()) + list(classifier.parameters()),
-        lr=5e-4
+        lr=2e-4, weight_decay=1e-2
     )
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=1e-5)
 
@@ -278,6 +290,9 @@ if __name__ == "__main__":
               f"TrainLoss {tl:.4f} | ValLoss {vl:.4f} | ValAcc {va:.4f} | "
               f"LR {optimizer.param_groups[0]['lr']:.1e} | k={eff_k:.2f}")
 
+    # ---------------------------
+    # Visualization
+    # ---------------------------
 
     epochs_range = range(1, epochs+1)
 
@@ -287,14 +302,14 @@ if __name__ == "__main__":
     plt.xlabel('Epoch'); plt.ylabel('Loss')
     plt.title('Loss over Epochs')
     plt.legend(); plt.grid()
-    plt.savefig("./mnist_loss.png")
+    plt.savefig("./cifar_loss.png")
 
     plt.figure()
     plt.plot(epochs_range, history['val_acc'], label='Val Accuracy')
     plt.xlabel('Epoch'); plt.ylabel('Accuracy')
     plt.title('Validation Accuracy over Epochs')
     plt.legend(); plt.grid()
-    plt.savefig("./mnist_acc.png")
+    plt.savefig("./cifar_acc.png")
 
     plt.figure()
     plt.plot(epochs_range, history['lr'], label='Learning Rate')
@@ -307,6 +322,6 @@ if __name__ == "__main__":
     plt.xlabel('Epoch'); plt.ylabel('Effective k')
     plt.title('Adaptive k')
     plt.legend(); plt.grid()
-    plt.savefig("./mnist_k.png")
+    plt.savefig("./cifar_k.png")
 
     plt.show()
