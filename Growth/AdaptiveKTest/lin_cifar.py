@@ -191,7 +191,7 @@ class PerceiverIO(nn.Module):
 def train_one_epoch(model, embed, classifier, loader, optimizer, device):
     model.train(); embed.train(); classifier.train()
     total_loss, total = 0, 0
-    for imgs, labels in tqdm(loader, desc="Train"):
+    for batch_idx, (imgs, labels) in enumerate(loader, start=1):
         imgs, labels = imgs.to(device), labels.to(device)
         b = imgs.size(0)
 
@@ -277,7 +277,8 @@ if __name__ == "__main__":
         gate_k  = model.layers[0][0].gate_k.detach()
         alpha_k = model.layers[0][0].alpha_k.detach()
         eff_k = (torch.sigmoid(gate_k) * alpha_k).mean().item()
-
+        k_max = model.layers[0][0].proj_k.size(1)  # proj_k: [seq_len_kv, k_max]
+        eff_k *= k_max
         # 기록
         history['train_loss'].append(tl)
         history['val_loss'].append(vl)
@@ -319,7 +320,7 @@ if __name__ == "__main__":
     plt.figure()
     plt.plot(epochs_range, k_history, label='Mean Effective k')
     plt.xlabel('Epoch'); plt.ylabel('Effective k')
-    plt.title('Adaptive k over Epochs')
+    plt.title('Adaptive k')
     plt.legend(); plt.grid()
     plt.savefig("./cifar_k.png")
 
