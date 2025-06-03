@@ -43,6 +43,6 @@ Growth
 
 ## 🔗 관련 링크
 
-[그라운드 룰](https://github.com/Capstone-IT-in/CapstoneDesignProject/blob/main/Ground_Rule.md)
-[데모 영상](https://youtu.be/PSTCc0QR7L0?feature=shared)
+[그라운드 룰](https://github.com/Capstone-IT-in/CapstoneDesignProject/blob/main/Ground_Rule.md)] <br>
+[그로쓰 실험 영상](https://youtu.be/PSTCc0QR7L0?feature=shared)
 
