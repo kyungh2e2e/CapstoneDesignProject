@@ -33,7 +33,7 @@ pip install torch==1.10.2 torchvision==0.11.3 einops==0.8.0 matplotlib
 - einops 0.8.0
 - matplotlib
 
-실행에 오랜 시간이 소요될 수 있으므로 GPU가 사용 가능한한 환경에서 실험을 진행하시는 걸 추천드립니다.
+실행에 오랜 시간이 소요될 수 있으므로 GPU를 사용 가능한 환경에서 실험을 진행하시는 걸 추천드립니다.
 
 ---
 
