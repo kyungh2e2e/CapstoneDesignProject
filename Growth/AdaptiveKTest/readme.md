@@ -1,30 +1,43 @@
-# README
+# Adaptive K Test
 
-## Requirements
+## Source Code
 
-- Python 3.8+
-- PyTorch 1.10.2
-- torchvision 0.11.3
-- einops 0.8.0
-- matplotlib
+| 파일명 | 설명 |
+|--------|------|
+| `lin_mnist.py` | MNIST(흑백 이미지) 데이터셋을 대상으로 실험을 수행하는 스크립트 |
+| `lin_cifar.py` | CIFAR-10(컬러 이미지) 데이터셋을 대상으로 실험을 수행하는 스크립트 |
+| `Perceiver/` | Perceiver IO 모델 본체 및 Attention 구조 정의 포함 |
+| `LinformerAttention/` | Adaptive k를 구현하는 핵심 Attention 모듈 |
+| `outputs/` | 시각화된 실험 결과(Accuracy, Adaptive k, Loss 등) 이미지 저장 폴더 |
 
-설치 명령어:
+---
+
+## ⚙️ How to Build
+
+본 프로젝트는 별도의 빌드가 필요하지 않습니다. Python 스크립트 실행만으로 모든 기능이 동작합니다.
+
+---
+
+## 📦 How to Install
+
+다음 명령어로 필수 라이브러리를 설치하세요:
 
 ```bash
 pip install torch==1.10.2 torchvision==0.11.3 einops==0.8.0 matplotlib
 ```
 
-## Project Overview
+**필수 환경:**
+- Python 3.8 이상
+- PyTorch 1.10.2
+- torchvision 0.11.3
+- einops 0.8.0
+- matplotlib
 
-본 프로젝트는 Perceiver IO에 Linformer 기반 Adaptive Attention을 통합한 **Linceiver IO** 모델을 사용하여, 입력 복잡도에 따라 압축 차원 k가 **동적으로 조절**되는지를 실험하는 코드입니다.
+실행에 오랜 시간이 소요될 수 있으므로 GPU가 사용 가능한한 환경에서 실험을 진행하시는 걸 추천드립니다.
 
-- `lin_mnist.py`: MNIST (흑백 이미지) 데이터셋을 대상으로 실험을 수행하는 스크립트
-- `lin_cifar.py`: CIFAR-10 (컬러 이미지) 데이터셋을 대상으로 실험을 수행하는 스크립트
-- `outputs/`: 학습 결과 그래프(`accuracy`, `adaptive k`, `loss`)가 저장되는 폴더
+---
 
-두 실험 모두 동일한 Linceiver IO 구조를 사용하며, 입력 복잡도 차이에 따른 `adaptive k`의 변화 양상을 시각화합니다.
-
-## How to Run
+## 🧪 How to Test
 
 ### 1. MNIST 실험 실행
 
@@ -38,28 +51,75 @@ python lin_mnist.py
 python lin_cifar.py
 ```
 
+### 결과 확인
 
-실행 시 `./` 디렉토리에 다음과 같은 결과 이미지가 생성됩니다:
+각 스크립트를 실행하면 `./outputs/` 디렉토리에 다음과 같은 이미지가 생성됩니다:
 
 - `mnist_accuracy.png`, `mnist_k.png`
-- `cifar_acc.png`, `cifar_k.png`
+- `cifar_accuracy.png`, `cifar_k.png`
 
-## 실험 목적
+---
 
-- 단순한 입력(MNIST)과 복잡한 입력(CIFAR-10)에서 Linceiver IO의 `adaptive k`가 어떻게 다르게 조절되는지 관찰합니다.
-- `effective k`는 학습 중 `sigmoid(gate_k) * alpha_k`로 계산되며, 낮은 차원으로 수렴할수록 연산 효율이 높습니다.
+## 📁 Sample Data
 
-## 결과 해석 예시
+- MNIST 및 CIFAR-10 데이터셋은 `torchvision.datasets`를 통해 **자동 다운로드**됩니다.
+- 별도의 수동 다운로드나 외부 데이터 준비는 필요하지 않습니다.
 
-- MNIST에서는 `k`가 빠르게 감소하고 낮은 값에서 수렴하여 고효율 학습 구조를 형성합니다.
-- CIFAR-10에서는 `k`가 점진적으로 감소하고 일정 수준 이하로는 유지되어 정보 손실을 방지합니다.
+---
 
-## 구조 설명
+## 📚 Used Open Source Libraries
 
-| 파일명 | 설명 |
-| --- | --- |
-| `lin_mnist.py` | MNIST 기반 Adaptive k 실험 코드 |
-| `lin_cifar.py` | CIFAR-10 기반 Adaptive k 실험 코드 |
-| `PerceiverIO` | 모델 본체 및 attention 구조 정의 포함 |
-| `LinformerAttention` | Adaptive k를 구현하는 핵심 attention 모듈 |
-| `outputs/` | 시각화된 결과 이미지 저장 폴더 |
+본 프로젝트는 다음의 오픈소스 라이브러리를 활용합니다:
+
+- [PyTorch](https://pytorch.org/) - 딥러닝 프레임워크 (License: BSD)
+- [Torchvision](https://github.com/pytorch/vision) - 데이터셋 및 변환 도구 (License: BSD)
+- [einops](https://github.com/arogozhnikov/einops) - 텐서 재구성 유틸리티 (License: MIT)
+- [matplotlib](https://matplotlib.org/) - 시각화 도구 (License: PSF)
+
+---
+
+## 🧠 Project Overview
+
+이 프로젝트는 Perceiver IO에 Linformer 기반 Adaptive Attention을 적용한 **Linceiver IO** 모델을 구현합니다. 입력 복잡도에 따라 압축 차원 `k`를 **동적으로 조절**하는 구조로, 효율성과 정보 보존을 동시에 추구합니다.
+
+### 특징:
+- 단순한 입력(MNIST)과 복잡한 입력(CIFAR-10)에서 adaptive k 조절 실험
+- `effective k`는 학습 중 `sigmoid(gate_k) * alpha_k`로 계산되어 효율적인 차원 사용 달성
+
+---
+
+## 📈 결과 해석 예시
+
+- **MNIST**: `k` 값이 빠르게 감소하여 저차원에서도 안정적으로 학습 가능
+- **CIFAR-10**: 고차원 입력에도 점진적인 차원 축소가 적용되어 정보 손실 없이 효율 유지
+
+---
+
+## ▶️ 실행 스크립트 예시
+
+다음과 같은 스크립트를 통해 전체 실험을 한 번에 실행할 수 있습니다:
+
+```bash
+#!/bin/bash
+echo "Running MNIST..."
+python lin_mnist.py
+
+echo "Running CIFAR-10..."
+python lin_cifar.py
+
+echo "Done. Results saved in outputs/"
+```
+---
+
+## 🚀 Google Colab에서 바로 실행
+
+Python 스크립트 실행 대신 Google Colabatory 파일로도 실행 가능합니다.
+
+Linceiver IO의 Adaptive K 실험을 직접 실행해보고 싶다면 아래 Colab 버튼을 눌러보세요:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Capstone-IT-in/CapstoneDesignProject/blob/main/Growth/AdaptiveKTest/AdaptiveKTest.ipynb)
+
+해당 ipynb파일을 사용해 설명한 튜토리얼 블로그 글도 있으니 참고해주세요.
+
+✍️ 관련 글 보기: [Adaptive K 실험 정리 블로그 포스트](https://kyungcotry.tistory.com/9)
+
