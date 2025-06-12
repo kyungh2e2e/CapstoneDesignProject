@@ -95,7 +95,7 @@ python lin_cifar.py
 
 - 아래는 MNIST와 CIFAR-10에 대한 Linceiver IO의 학습 결과를 시각화한 그래프입니다:
 
-![전체 결과](https://github.com/kyungh2e2e/CapstoneDesignProject/blob/79daad0108ffe71408325609568af5d1e586a4c3/AdaptiveK%EA%B2%B0%EA%B3%BC.png)
+![전체 결과]<img src = "https://github.com/kyungh2e2e/CapstoneDesignProject/blob/79daad0108ffe71408325609568af5d1e586a4c3/AdaptiveK%EA%B2%B0%EA%B3%BC.png" width="400"/>
 
 **MNIST 결과 요약**
 
